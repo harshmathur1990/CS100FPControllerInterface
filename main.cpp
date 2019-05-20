@@ -15,6 +15,7 @@
 //#include <dir.h>
 #include <string>
 #include <sstream>
+#include "tse_camera.h"
 
 
 int off_code(int number){
@@ -107,7 +108,7 @@ int main()
     char sse[]={'O','3','\r'};
     sucess=WriteFile(h,sse,sizeof(sse),&write,NULL);
     while (1) {
-        std::cout<<"Enter e for exit or r for read or b for balance mode or o for operate mode or enter value between -2048 and 2047"<<std::endl;
+        std::cout<<"Enter e for exit or r for read or b for balance mode or o for operate mode or s for scan mode or enter value between -2048 and 2047"<<std::endl;
         getline(std::cin, input);
         if (input[0] == 'e' || input[0] == 'E') {
             break;
@@ -141,6 +142,53 @@ int main()
 			to_be_sent = "O0";
         	to_be_sent.append("\r");
         	sucess=WriteFile(h,to_be_sent.c_str(),sizeof(to_be_sent.c_str()),&write,NULL);
+            continue;
+        }
+        else if (input[0] == 's' || input[0] == 'S') {
+        	std::cout<<"Enter min and max values, step size and exposure time(25,50,75,100,125,150) between -2048 and 2047"<<std::endl;
+        	int min, max, incr, exp;
+        	std::cin>>min>>max>>incr>>exp;
+        	if ((min < -2048 || min > 2047) || (max < -2048 || max > 2047)){
+        		std::cout<<"Valid values are between -2048 and 2047"<<std::endl;
+        		continue;
+			}
+        	if (min > max){
+        		std::cout<<"Min must be less thasn max"<<std::endl;
+        		continue;
+			}
+			if (incr <= 0) {
+				std::cout<<"step must be greater than zero"<<std::endl;
+        		continue;
+			}
+			if (exp < 25) {
+				std::cout<<"Exposure must be greater than 25"<<std::endl;
+        		continue;
+			}
+			int i = min;
+			while (i <= max) {
+				std::string to_be_sent;
+				to_be_sent = configure_for_wavelength(i);
+				std::cout<<"The final word to be sent is: "<<to_be_sent<<std::endl;
+				sucess=WriteFile(h,to_be_sent.c_str(),sizeof(to_be_sent.c_str()),&write,NULL);
+				if (write != sizeof(to_be_sent.c_str()) ){
+					std::cout<<"Not all data written to port"<<std::endl;
+				}
+				to_be_sent = "I0";
+		        to_be_sent.append("\r");
+		        sucess=WriteFile(h,to_be_sent.c_str(),sizeof(to_be_sent.c_str()),&write,NULL);
+		        std::string filename = "";
+		        std::stringstream ss;
+		        if (i < 0) {
+		        	ss<<-i;
+		        	filename = filename.append("MINUS_").append(ss.str());
+				}
+				else {
+					ss<<i;
+					filename = filename.append(ss.str());
+				}
+		        capture ( const_cast<char*>(filename.c_str()),  exp, const_cast<char*>(filename.c_str()) );
+		        i += incr;
+			}
             continue;
         }
         step = atoi(input.c_str());
