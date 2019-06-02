@@ -11,7 +11,7 @@ ResourceIncludes=
 MakeIncludes=
 Compiler=
 CppCompiler=
-Linker=cfitsio.dll_@@_libfli.lib_@@_
+Linker=cfitsio.dll_@@_libfli.lib_@@_PCO_CDlg.lib_@@_Pco_conv.lib_@@_PCO_CryptDll.lib_@@_pco_edge_gs_calc.lib_@@_SC2_Cam.lib_@@_SC2_DLG.lib_@@_
 IsCpp=1
 Icon=
 ExeOutput=
@@ -70,16 +70,6 @@ Priority=1000
 OverrideBuildCmd=0
 BuildCmd=
 
-[Unit3]
-FileName=tse_camera.h
-CompileCpp=1
-Folder=
-Compile=1
-Link=1
-Priority=1000
-OverrideBuildCmd=0
-BuildCmd=
-
 [Unit6]
 FileName=libfli.h
 CompileCpp=1
@@ -92,6 +82,16 @@ BuildCmd=
 
 [Unit7]
 FileName=stdafx.h
+CompileCpp=1
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit3]
+FileName=pco_camera.cpp
 CompileCpp=1
 Folder=
 Compile=1

@@ -15,7 +15,10 @@
 //#include <dir.h>
 #include <string>
 #include <sstream>
-#include "tse_camera.h"
+#include <time.h>
+#include <ctime>
+//#include "tse_camera.h"
+#include "pco_camera.h"
 
 
 int off_code(int number){
@@ -73,10 +76,22 @@ std::string configure_for_wavelength(int int_wave){
     return to_be_sent;
 }
 
+std::string get_time_string() {
+	time_t rawtime;
+	struct tm *timeinfo;
+	char buffer[100];
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(buffer, sizeof(buffer), "%d%m%YT%H%M%S",timeinfo);
+	std::string str(buffer);
+	return buffer;
+}
+
 
 int main()
 {
-	char buffer[4];
+
+	char buffer[16];
 	DWORD read = 0;
     std::string input;
     int step;
@@ -108,7 +123,7 @@ int main()
     char sse[]={'O','3','\r'};
     sucess=WriteFile(h,sse,sizeof(sse),&write,NULL);
     while (1) {
-        std::cout<<"Enter e for exit or r for read or b for balance mode or o for operate mode or s for scan mode or enter value between -2048 and 2047"<<std::endl;
+        std::cout<<"Enter e for exit or r for read or b for balance mode or o for operate mode or s for scan mode or c for capture"<<std::endl;
         getline(std::cin, input);
         if (input[0] == 'e' || input[0] == 'E') {
             break;
@@ -120,14 +135,14 @@ int main()
         	sucess=WriteFile(h,to_be_sent.c_str(),sizeof(to_be_sent.c_str()),&write,NULL);
             read = 0;
 			ReadFile(h, buffer, sizeof(buffer), &read, NULL);
-            readstream<<read;
-            std::string out = readstream.str();
+//            readstream<<read;
+//            std::string out = readstream.str();
 //            std::string word = out.substr(1, std::string::npos);
 //            std::string x_0 = "0x";
 //            word = x_0.append(word);
 //            int int_word = atoi(word.c_str());
 //            int_word = int_word ^ 0x800;
-            std::cout<<"The word read is :"<<out<<std::endl;
+            std::cout<<"The word read is blah:"<<buffer<<std::endl;
             continue;
         }
         else if (input[0] == 'b' || input[0] == 'B') {
@@ -160,76 +175,172 @@ int main()
 				std::cout<<"step must be greater than zero"<<std::endl;
         		continue;
 			}
-			if (exp < 25) {
+			if (exp < 0) {
 				std::cout<<"Exposure must be greater than 25"<<std::endl;
         		continue;
 			}
 			int i = min;
 			while (i <= max) {
+				int stepped = i;
+				if (stepped >= 0) {
+				stepped = stepped - 2048;
+				}
+				else {
+					stepped = stepped + 2048;
+				}
 				std::string to_be_sent;
-				to_be_sent = configure_for_wavelength(i);
+				to_be_sent = configure_for_wavelength(stepped);
 				std::cout<<"The final word to be sent is: "<<to_be_sent<<std::endl;
-				sucess=WriteFile(h,to_be_sent.c_str(),sizeof(to_be_sent.c_str()),&write,NULL);
-				if (write != sizeof(to_be_sent.c_str()) ){
+				char sending[] = {
+		        	to_be_sent[0],
+		        	to_be_sent[1],
+		        	to_be_sent[2],
+		        	to_be_sent[3],
+		        	to_be_sent[4],
+		        	to_be_sent[5],
+		        	to_be_sent[6],
+		        	to_be_sent[7],
+		        	to_be_sent[8],
+		        	'\r'
+				};
+				//check for out of range
+				std::string read_string;
+				read_string = "?";
+	        	read_string.append("\r");
+	        	sucess=WriteFile(h,read_string.c_str(),sizeof(read_string.c_str()),&write,NULL);
+	            read = 0;
+				ReadFile(h, buffer, sizeof(buffer), &read, NULL);
+				if (buffer[0] == '0'){
+					std::cout<<"System out of range"<<std::endl;
+					break;
+				}
+				if (buffer[0] == '1'){
+					std::cout<<"System in balance mode"<<std::endl;
+					break;
+				}
+				//END
+				
+				sucess=WriteFile(h,sending,sizeof(sending),&write,NULL);
+				if (write != sizeof(sending) ){
 					std::cout<<"Not all data written to port"<<std::endl;
 				}
 				to_be_sent = "I0";
 		        to_be_sent.append("\r");
 		        sucess=WriteFile(h,to_be_sent.c_str(),sizeof(to_be_sent.c_str()),&write,NULL);
-		        std::string filename = "";
+		        std::string filename = "_";
+		        std::string thz = "000";
+		        std::string twz = "00";
+		        std::string oz = "0";
+		        std::string zz = "";
 		        std::stringstream ss;
 		        if (i < 0) {
 		        	ss<<-i;
-		        	filename = filename.append("MINUS_").append(ss.str());
+		        	std::string num = ss.str();
+		        	if (num.length() == 1) num = thz.append(num);
+		        	if (num.length() == 2) num = twz.append(num);
+		        	if (num.length() == 3) num = oz.append(num);
+		        	if (num.length() == 4) num = zz.append(num);
+		        	filename = filename.append("N_").append(num);
 				}
 				else {
 					ss<<i;
-					filename = filename.append(ss.str());
+					std::string num = ss.str();
+		        	if (num.length() == 1) num = thz.append(num);
+		        	if (num.length() == 2) num = twz.append(num);
+		        	if (num.length() == 3) num = oz.append(num);
+		        	if (num.length() == 4) num = zz.append(num);
+					filename = filename.append("P_").append(num);
 				}
-		        capture ( const_cast<char*>(filename.c_str()),  exp, const_cast<char*>(filename.c_str()) );
+				filename = filename.append(".fits");
+				filename = get_time_string().append(filename);
+				std::cout<<"Camera Args: "<<filename<<"  -   "<<exp<<std::endl;
+		        capture_this ( const_cast<char*>(filename.c_str()),  exp );
 		        i += incr;
+		        Sleep(1000);
 			}
             continue;
         }
-        step = atoi(input.c_str());
-        std::string to_be_sent;
-        if (step < -2048 || step > 2047) {
-        	std::cout<<"Valid values are between -2048 and 2047"<<std::endl;
+        else if (input[0] == 'c' || input[0] == 'C') {
+        	std::cout<<"enter value between -2048 and 2047 for spacing and value for exposure"<<std::endl;
+        	int step, exp;
+        	std::cin>>step>>exp;
+	        std::string to_be_sent;
+	        if (step < -2048 || step > 2047) {
+	        	std::cout<<"Valid values are between -2048 and 2047"<<std::endl;
+	        	continue;
+			}
+			int ori = step;
+			if (step >= 0) {
+				step = step - 2048;
+			}
+			else {
+				step = step + 2048;
+			}
+			std::cout<<"The value of Step to be applied is: "<<step<<std::endl;
+			to_be_sent = configure_for_wavelength(step);
+	//        to_be_sent.append("\r");
+	        std::cout<<"The final word to be sent is: "<<to_be_sent<<std::endl;
+	        char sending[] = {
+	        	to_be_sent[0],
+	        	to_be_sent[1],
+	        	to_be_sent[2],
+	        	to_be_sent[3],
+	        	to_be_sent[4],
+	        	to_be_sent[5],
+	        	to_be_sent[6],
+	        	to_be_sent[7],
+	        	to_be_sent[8],
+	        	'\r'
+			};
+	        //char sst[]={'I','7','0','0','0','P','1','P','0','\r'};
+	    	//sucess=WriteFile(h,sst,sizeof(sst),&write,NULL);
+	//       char sse[]={'I','4','8','0','A','P','1','P','0','\r'};
+	//       sucess=WriteFile(h,sse,sizeof(sse),&write,NULL);
+	        sucess=WriteFile(h,sending,sizeof(sending),&write,NULL);
+			if (write != sizeof(sending) ){
+				std::cout<<"Not all data written to port"<<std::endl;
+			}
+			//Capture code
+			std::string filename = "_";
+	        std::string thz = "000";
+	        std::string twz = "00";
+	        std::string oz = "0";
+	        std::string zz = "";
+	        std::stringstream ss;
+	        if (ori < 0) {
+	        	ss<<-ori;
+	        	std::string num = ss.str();
+	        	if (num.length() == 1) num = thz.append(num);
+	        	if (num.length() == 2) num = twz.append(num);
+	        	if (num.length() == 3) num = oz.append(num);
+	        	if (num.length() == 4) num = zz.append(num);
+	        	filename = filename.append("N_").append(num);
+			}
+			else {
+				ss<<ori;
+				std::string num = ss.str();
+	        	if (num.length() == 1) num = thz.append(num);
+	        	if (num.length() == 2) num = twz.append(num);
+	        	if (num.length() == 3) num = oz.append(num);
+	        	if (num.length() == 4) num = zz.append(num);
+				filename = filename.append("P_").append(num);
+			}
+			filename = filename.append(".fits");
+			filename = get_time_string().append(filename);
+			std::cout<<"Camera Args: "<<filename<<"  -   "<<exp<<std::endl;
+	        capture_this ( const_cast<char*>(filename.c_str()),  exp );
+			
+			//END
+			
+			to_be_sent = "I0";
+	        to_be_sent.append("\r");
+	        sucess=WriteFile(h,to_be_sent.c_str(),sizeof(to_be_sent.c_str()),&write,NULL);
+	        continue;
+		}
+        else {
+        	std::cout<<"Invalid Mode"<<step<<std::endl;
         	continue;
 		}
-		if (step >= 0) {
-			step = step - 2048;
-		}
-		else {
-			step = step + 2048;
-		}
-		std::cout<<"The value of Step to be applied is: "<<step<<std::endl;
-		to_be_sent = configure_for_wavelength(step);
-//        to_be_sent.append("\r");
-        std::cout<<"The final word to be sent is: "<<to_be_sent<<std::endl;
-        char sending[] = {
-        	to_be_sent[0],
-        	to_be_sent[1],
-        	to_be_sent[2],
-        	to_be_sent[3],
-        	to_be_sent[4],
-        	to_be_sent[5],
-        	to_be_sent[6],
-        	to_be_sent[7],
-        	to_be_sent[8],
-        	'\r'
-		};
-        //char sst[]={'I','7','0','0','0','P','1','P','0','\r'};
-    	//sucess=WriteFile(h,sst,sizeof(sst),&write,NULL);
-//       char sse[]={'I','4','8','0','A','P','1','P','0','\r'};
-//       sucess=WriteFile(h,sse,sizeof(sse),&write,NULL);
-        sucess=WriteFile(h,sending,sizeof(sending),&write,NULL);
-		if (write != sizeof(sending) ){
-			std::cout<<"Not all data written to port"<<std::endl;
-		}
-		to_be_sent = "I0";
-        to_be_sent.append("\r");
-        sucess=WriteFile(h,to_be_sent.c_str(),sizeof(to_be_sent.c_str()),&write,NULL);
     }
     std::string to_be_sent;
 	to_be_sent = "O2";
